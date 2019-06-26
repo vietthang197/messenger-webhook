@@ -6,24 +6,6 @@ const
   bodyParser = require('body-parser'),
   app = express().use(bodyParser.json()); // creates express http server
 
-  const Nexmo = require('nexmo');
-
-  const options = {
-  // If true, log information to the console
-  debug: true|false,
-  // append info the the User-Agent sent to Nexmo
-  // e.g. pass 'my-app' for /nexmo-node/1.0.0/4.2.7/my-app
-  appendToUserAgent: "my-app",
-  // Set a custom timeout for requests to Nexmo in milliseconds. Defaults to the standard for Node http requests, which is 120,000 ms.
-  timeout: 111
-};
-
-const nexmo = new Nexmo({
-    apiKey: 'EAAHa5utZBoAkBAIXB63zRVPE6qIZAZCZC3DHNGUwLG7Y3LwoRsFUDXDOVjO6a4ZBQiy7TtdfPKZAXbgfSFLdMZAXQVQM8hCz3m1ZAkpbZBQwd4GlKZAsiMLBwx6GeCAQqDX6XmxZC0ZCjbwihvsKLFNHFMOG4w1ripELn7ZCXPIlvXHgiWCYfZCXP97K2O',
-    apiSecret: '117f440d1783f5ef2387fc1541b8999e',
-    applicationId: '522160304988169',
-    privateKey: null,
-  }, options);
 
 // Sets server port and logs message on success
 app.listen(process.env.PORT || 1337, () => console.log('webhook is listening'));
