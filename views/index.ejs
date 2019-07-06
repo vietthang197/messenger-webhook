@@ -1,11 +1,85 @@
 <!DOCTYPE html>
-<html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+
   <head>
     <title><%= title %></title>
     <link rel='stylesheet' href='/stylesheets/style.css' />
+    <meta http-equiv="content-type" content="application/xhtml+xml; charset=UTF-8" />
+
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="google" value="notranslate">
+
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap-theme.min.css">
+
+    <title>My App</title>
   </head>
   <body>
-    <h1><%= title %></h1>
-    <p>Welcome to <%= title %></p>
+  <div class="container">
+    <!-- Image and text -->
+    <nav class="navbar navbar-light bg-light">
+      <a class="navbar-brand" href="https://www.facebook.com/DatTenGiChoNoBa/" target="_blank">
+        <img src="/images/favicon.png" width="30" height="30" class="d-inline-block align-top" alt="">
+        UETER Chatbot fan page
+      </a>
+    </nav>
+    <div class="container">
+      <div class="row">
+        <div class="col">
+          <p style="text-align: center;">
+            <img src="/images/favicon.png" width="200" height="200"  style="vertical-align: middle; border-style: none;" alt="">
+          </p>
+        </div>
+      </div>
+      <div class="row">
+        <h2 style="text-align: center;">UETER Chatbot <strong><version BETA 1.0></strong></h2>
+        <p style="text-align: center; font-family: 'Arial';">Nơi kết nối triệu con tym</p>
+      </div>
+      <div class="row">
+        <div style="display: flex; align-items: center; justify-content: center;">
+          <a class="btn btn-sm" style="margin: 1%;" href="https://github.com/vietthang197/messenger-webhook">
+            Source Code
+          </a>
+          <a class="btn btn-sm" style="margin: 1%;" href="https://www.facebook.com/sudolv">
+            Devloper
+          </a>
+          <a class="btn btn-sm" style="margin: 1%;" href="/license" target="_blank">
+            License
+          </a>
+        </div>
+      </div>
+
+<!--      <script>-->
+<!--        window.fbAsyncInit = function() {-->
+<!--          FB.init({-->
+<!--            appId      : '522160304988169',-->
+<!--            cookie     : true,-->
+<!--            xfbml      : true,-->
+<!--            version    : 'v3.3'-->
+<!--          });-->
+
+<!--          FB.AppEvents.logPageView();-->
+<!--          -->
+<!--          FB.Event.subscribe('auth.login', function () {-->
+<!--            window.location = "https://infinite-peak-51661.herokuapp.com/fb-login";-->
+<!--          });-->
+
+<!--        };-->
+
+<!--        (function(d, s, id){-->
+<!--          var js, fjs = d.getElementsByTagName(s)[0];-->
+<!--          if (d.getElementById(id)) {return;}-->
+<!--          js = d.createElement(s); js.id = id;-->
+<!--          js.src = "https://connect.facebook.net/en_US/sdk.js";-->
+<!--          fjs.parentNode.insertBefore(js, fjs);-->
+<!--        }(document, 'script', 'facebook-jssdk'));-->
+<!--      </script>-->
+<!--      <div id="fb-root"></div>-->
+<!--      <script async defer crossorigin="anonymous" src="https://connect.facebook.net/vi_VN/sdk.js#xfbml=1&version=v3.3&appId=522160304988169&autoLogAppEvents=1"></script>-->
+    </div>
+  </div>
+
+    <script src="//code.jquery.com/jquery-1.11.3.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
   </body>
 </html>

@@ -1,6 +1,7 @@
 'use strict';
 var express = require('express');
 var router = express.Router();
+var imageChecker = require('is-image-url');
 
 // Imports firebase database
 const adminFirebase = require('firebase-admin');
@@ -16,14 +17,15 @@ adminFirebase.initializeApp({
 });
 
 // facebook sdk token
-const pageToken = 'EAAHa5utZBoAkBAPwwWRTiEb3IzZCYZBE6J02EIL6MQZCz9Taf5J8aecTHZBvkze4yZCAMHi3gXKM7HqYWrRKSw6sgqU0ylzUU0NRDOgzQjQSuZB59qGeXrizVz4A0lZAWMOIqfem8qG4auyFzZBk4JXklCwDsmQFNdxhFWW8KduJ2nNGFr8CnWmXf';
-const  urlApi = 'https://graph.facebook.com/v3.3/me/messages?access_token=' + pageToken;
-
+const pageToken = 'insert_paqe_token_here';
+const urlApiSendText = 'https://graph.facebook.com/v3.3/me/messages?access_token=' + pageToken;
+const urlApiSendAttachments = 'https://graph.facebook.com/v3.3/me/message_attachments?access_token=' + pageToken;
+const urlApiSendMessageWithAttachments = 'https://graph.facebook.com/v3.3/me/messages?access_token=' + pageToken;
 //firebase 
 const firebaseDatabase = adminFirebase.database();
 
 // function to get 2 sender id to chat
-function getSenderQueueToChat() {
+function getRandomSenderToConnectChat() {
     return new Promise((resolve, reject) => {
         firebaseDatabase.ref('queue').orderByChild('sender_id').limitToFirst(2).on("value", function (snapshot) {
             resolve(snapshot.val());
@@ -46,6 +48,105 @@ function checkSenderIdExistsInChatting(messengerIdSearch) {
         firebaseDatabase.ref('chatting').orderByKey().equalTo(messengerIdSearch).on("value", function (snapshot) {
             resole(snapshot.val());
         });
+    });
+}
+
+// function insert senderId to queue
+function insertSenderToQueue(senderId) {
+    return new Promise((resole, reject) => {
+        firebaseDatabase.ref('queue').push({
+            "sender_id": senderId
+        }).on('value', function (snapshot) {
+            resole(snapshot.val());
+        });
+    });
+}
+
+// send message text from api to facebook
+function responseMesseageToFacebook(senderId, messageText) {
+    return new Promise((resole, reject) => {
+        let dataSend = {
+            "messaging_type": "RESPONSE",
+            "recipient": {
+                "id": senderId
+            },
+            "message": {
+                "text": messageText
+            }
+        };
+
+        let options = {
+            method: 'POST',
+            uri: urlApiSendText,
+            body: dataSend,
+            headers: {
+                "Content-type": "application/json; charset=UTF-8"
+            },
+            json: true
+        };
+
+        requestPromise(options).then(fbRes => {
+           resole(fbRes);
+        });
+    });
+}
+
+// send attachments from api to facebook
+function responseAttachmentsToFacebook(senderId, type, url, stickerId) {
+    let dataSend = {
+        "message": {
+            "attachment": {
+                "type": type,
+                "payload": {
+                    "is_reusable": true,
+                    "url": url
+                }
+            }
+        }
+    };
+
+    let options = {
+        method: 'POST',
+        uri: urlApiSendAttachments,
+        body: dataSend,
+        headers: {
+            "Content-type": "application/json; charset=UTF-8"
+        },
+        json: true
+    };
+
+    requestPromise(options).then(fbRes => {
+        sendAttachmentIdToFacebook(fbRes['attachment_id'], senderId, type);
+    });
+}
+
+function sendAttachmentIdToFacebook(attactmentId, senderId, type) {
+    let dataSendAttId = {
+        "recipient":{
+            "id":senderId
+        },
+        "message":{
+            "attachment":{
+                "type":type,
+                "payload":{
+                    "attachment_id": attactmentId
+                }
+            }
+        }
+    };
+
+    let optionsMessageAttachments = {
+        method: 'POST',
+        uri: urlApiSendMessageWithAttachments,
+        body: dataSendAttId,
+        headers: {
+            "Content-type": "application/json; charset=UTF-8"
+        },
+        json: true
+    };
+
+    requestPromise(optionsMessageAttachments).then(fbRes => {
+        console.log(fbRes);
     });
 }
 
@@ -90,98 +191,132 @@ router.post('/', async function (req, res, next) {
             webhook_event = entry.messaging[0];
         });
 
-        if (webhook_event['message'] !== undefined && webhook_event['message']['is_echo'] !== true) {
+        try {
+            if (webhook_event['message'] !== undefined && webhook_event['message']['is_echo'] !== true) {
 
-            let messageOfUser = webhook_event['message']['text'];
+                let idSenderServerResponse = webhook_event.sender.id;
 
-            console.log(webhook_event);
+                let responseMessageFromServer = "Đây là tin nhắn tự động từ autobot, from Nodejs Server! BOT đang trong quá trình hoàn thiện chưa triển khai. Dev: Lê Việt Thắng!";
 
-            let messengerId = await checkSenderIdExistsInChatting(webhook_event['sender']['id']);
-            console.log('messenger_id>>>' + webhook_event['sender']['id']);
-            console.log(messengerId);
+                // lấy nội dung tin nhắn của user
+                let messageOfUser = webhook_event['message']['text'];
 
-            let responseMessageFromServer = "Đây là tin nhắn tự động từ autobot, from Nodejs Server! BOT đang trong quá trình hoàn thiện chưa triển khai. Dev: Lê Việt Thắng!";
+                // gửi ảnh hoặc file
+                let attachmentsData = webhook_event['message']['attachments'];
 
-            if (messageOfUser !== undefined && messageOfUser !== null && messageOfUser.toUpperCase() === 'START') {
+                // log ra thông tin user
+                console.log(webhook_event);
 
-                 let senderToChat = await getSenderQueueToChat();
+                // kiểm tra xem user đang chat hay là tìm kiếm
+                let senderOnChatting = await checkSenderIdExistsInChatting(webhook_event['sender']['id']);
+                console.log(senderOnChatting);
 
-                let senderExists = await checkSenderIdExistsInQueue(webhook_event.sender.id);
+                // if sender in chatting
+                if (senderOnChatting !== undefined && senderOnChatting !== null) {
+                    console.log('>>>>> user chatting');
+                    let keyMessenger = Object.keys(senderOnChatting[webhook_event.sender.id]);
+                    if (messageOfUser !== undefined) {
+                        responseMessageFromServer = messageOfUser;
+                    } else {
+                        responseMessageFromServer = 'server response';
+                    }
+                    idSenderServerResponse = senderOnChatting[webhook_event.sender.id][keyMessenger];
 
-                if (senderExists !== null) {
-                    responseMessageFromServer = 'Đang tìm kiếm đối phương, xin bạn vui lòng đợi';
+                    if (messageOfUser !== undefined && messageOfUser !== null) {
+                        if (messageOfUser.toUpperCase() === 'END') {
+                            firebaseDatabase.ref('chatting').child(idSenderServerResponse).remove();
+                            firebaseDatabase.ref('chatting').child(webhook_event.sender.id).remove();
+                            await responseMesseageToFacebook(webhook_event.sender.id, '<3 Bạn đã kết thúc trò chuyện, gõ "start" để bắt đầu <3');
+                            await responseMesseageToFacebook(idSenderServerResponse, '<3 Đối phương đã kết thúc trò chuyện, gõ "start" để bắt đầu <3');
+                        } else if (messageOfUser.toUpperCase() === 'START'){
+                          await responseMesseageToFacebook(webhook_event.sender.id, ':) Bạn đang trong cuộc trò chuyện, gõ "end" dể kết thúc :)');
+                        } else {
+                            await responseMesseageToFacebook(idSenderServerResponse, messageOfUser);
+                        }
+                    } else if (attachmentsData !== undefined && attachmentsData !== null) {
+                        console.log(attachmentsData);
+                        let i = 0;
+                        for ( i = 0; i < attachmentsData.length; i++) {
+                            responseAttachmentsToFacebook(idSenderServerResponse, attachmentsData[i]['type'], attachmentsData[i]['payload']['url']);
+                        }
+                    }
                 }
 
-                let senderIdConnect = null;
+                // if sender not in chatting
+                if ((senderOnChatting === undefined || senderOnChatting === null) && messageOfUser !== undefined && messageOfUser !== null && messageOfUser.toUpperCase() === 'START') {
 
-                let senderKeyFirst = Object.keys(senderToChat)[0];
+                    responseMessageFromServer = ':) Đang tìm kiếm đối phương, xin bạn vui lòng đợi :)';
+                    await responseMesseageToFacebook(webhook_event.sender.id, responseMessageFromServer);
 
-                let senderKeySecond = Object.keys(senderToChat)[1];
+                    console.log('>>>>>>> start to find user');
 
-                if (senderKeyFirst !== undefined && senderKeyFirst !== null && senderKeySecond !== undefined && senderKeySecond !== null) {
-                    let senderIdFirst = senderToChat[senderKeyFirst]['sender_id'];
+                    let senderExists = await checkSenderIdExistsInQueue(webhook_event.sender.id);
 
-                    let senderIdSecond = senderToChat[senderKeySecond]['sender_id'];
+                    console.log(senderExists);
 
-                    if (senderKeyFirst !== null && senderKeySecond !== null) {
-                        if (senderIdFirst !== webhook_event['sender']['id']) {
-                            senderIdConnect = senderIdFirst;
-                        } else {
-                            senderIdConnect = senderIdSecond;
-                        }
-
-                        firebaseDatabase.ref('queue').child(senderKeyFirst).remove();
-                        firebaseDatabase.ref('queue').child(senderKeySecond).remove();
+                    // sender not in queue
+                    if (senderExists === null) {
+                        console.log('>>>>>>>>>> user pushed in queue');
+                        let valueInsertSenderId = await insertSenderToQueue( webhook_event['sender']['id']);
+                        console.log(valueInsertSenderId);
                     }
 
-                    firebaseDatabase.ref('chatting').child(senderIdConnect).push(webhook_event.sender.id);
-                    firebaseDatabase.ref('chatting').child(webhook_event.sender.id).push(senderIdConnect);
+                    console.log('>>>>>>> user exists in queue');
+
+                    let senderToChat = await getRandomSenderToConnectChat();
+
+                    console.log('>>>>>> value senderToChat');
+                    console.log(senderToChat);
+
+                    let senderIdConnect = null;
+
+                    let senderKeyFirst = Object.keys(senderToChat)[0];
+
+                    let senderKeySecond = Object.keys(senderToChat)[1];
+
+                    if (senderKeyFirst !== undefined && senderKeyFirst !== null && senderKeySecond !== undefined && senderKeySecond !== null && senderKeyFirst !== senderKeySecond) {
+                        let senderIdFirst = senderToChat[senderKeyFirst]['sender_id'];
+
+                        let senderIdSecond = senderToChat[senderKeySecond]['sender_id'];
+
+                        if (senderIdFirst !== webhook_event['sender']['id']) {
+                            senderIdConnect = senderIdFirst;
+                        } else if (senderIdConnect === null && webhook_event['sender']['id'] !== senderIdSecond) {
+                            senderIdConnect = senderIdSecond;
+                        }
+                        if (senderIdConnect !== null && senderIdConnect !== webhook_event.sender.id) {
+                            firebaseDatabase.ref('queue').child(senderKeyFirst).remove();
+                            firebaseDatabase.ref('queue').child(senderKeySecond).remove();
+                            firebaseDatabase.ref('chatting').child(senderIdConnect).push(webhook_event.sender.id);
+                            firebaseDatabase.ref('chatting').child(webhook_event.sender.id).push(senderIdConnect);
+
+                            console.log('>>>>>>>>>>>>senderIdConnect');
+                            console.log(senderIdConnect);
+
+                            await responseMesseageToFacebook(senderIdConnect, ':) Đã tìm thấy đối phương, hãy nhắn tin làm quen ngay nào! :)');
+                            await responseMesseageToFacebook(webhook_event.sender.id, ':) Đã tìm thấy đối phương, hãy nhắn tin làm quen ngay nào! :)');
+                        }
+
+                    }
+
+                    // responseMessageFromServer = '*Đã tìm thấy đối phương* Hãy nhắn tin để làm quen nào';
+                } else if ((senderOnChatting === undefined || senderOnChatting === null) && messageOfUser !== undefined && messageOfUser !== null && messageOfUser.toUpperCase() === 'END') {
+                    let senderQueueExists = await checkSenderIdExistsInQueue(webhook_event.sender.id);
+                    responseMessageFromServer = ':) Bạn chưa tìm kiếm, hãy gõ "start" để bắt đầu tìm kiếm :)';
+                    if (senderQueueExists !== null) {
+                        firebaseDatabase.ref('queue').child(Object.keys(senderQueueExists)[0]).remove();
+                        responseMessageFromServer = '<3 Bạn đã thoát khỏi hàng chờ , gõ "start" để tìm kiếm đối phương <3';
+                    }
+                    await responseMesseageToFacebook(webhook_event.sender.id, responseMessageFromServer);
+                } else if( senderOnChatting === undefined || senderOnChatting === null){
+                    await responseMesseageToFacebook(idSenderServerResponse,  ':) Bạn phải gõ "start" để bắt đầu tìm kiếm :)');
                 }
 
-                console.log(senderToChat);
 
-               // responseMessageFromServer = '*Đã tìm thấy đối phương* Hãy nhắn tin để làm quen nào';
             }
-
-            if (messageOfUser !== undefined && messageOfUser !== null && messageOfUser.toUpperCase() === 'END') {
-                responseMessageFromServer = "*Cuộc trò chuyện đã kết thúc!* Gõ \"start\" để bắt đầu tìm kiếm.";
-            }
-
-            let dataSend = {
-                "messaging_type": "RESPONSE",
-                "recipient": {
-                    "id": webhook_event['sender']['id']
-                },
-                "message": {
-                    "text": responseMessageFromServer
-                }
-            };
-
-            let options = {
-                method: 'POST',
-                uri: urlApi,
-                body: dataSend,
-                headers: {
-                    "Content-type": "application/json; charset=UTF-8"
-                },
-                json: true
-            };
-
-            let existsData = false;
-
-            let senderIdExists = await checkSenderIdExistsInQueue(webhook_event['sender']['id']);
-
-            if (senderIdExists !== null) {
-                existsData = true;
-            }
-
-            if (!existsData) {
-                firebaseDatabase.ref('queue').push({ "sender_id": webhook_event['sender']['id'] });
-            }
-
-            requestPromise(options).then(fbRes => {
-                console.log('sent response message');
-            });
+        } catch (e) {
+            console.log(e);
+            await responseMesseageToFacebook(webhook_event.sender.id, "Server Error");
         }
     }
 

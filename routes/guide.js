@@ -3,8 +3,7 @@ var router = express.Router();
 
 /* GET home page. */
 router.get('/', function(req, res, next) {
-  res.render('index', { title: 'UETER Chatbot' , isAuthenticated: req.isAuthenticated(), user: req.user});
-
+    res.render('guide', { title: 'How to use?' });
 });
 
 module.exports = router;
