@@ -17,10 +17,11 @@ adminFirebase.initializeApp({
 });
 
 // facebook sdk token
-const pageToken = 'insert_paqe_token_here';
+const pageToken = '';
 const urlApiSendText = 'https://graph.facebook.com/v3.3/me/messages?access_token=' + pageToken;
 const urlApiSendAttachments = 'https://graph.facebook.com/v3.3/me/message_attachments?access_token=' + pageToken;
 const urlApiSendMessageWithAttachments = 'https://graph.facebook.com/v3.3/me/messages?access_token=' + pageToken;
+const urlApiSendActionButtonToUser = 'https://graph.facebook.com/v2.6/me/messages?access_token=' + pageToken;
 //firebase 
 const firebaseDatabase = adminFirebase.database();
 
@@ -150,6 +151,47 @@ function sendAttachmentIdToFacebook(attactmentId, senderId, type) {
     });
 }
 
+// send button action to user
+function responseActionButtonToFacebook(senderId, title, textButton, payloadButton) {
+    return new Promise((resole, reject) => {
+       let dataSend = {
+           "recipient":{
+               "id":senderId
+           },
+           "message":{
+               "attachment":{
+                   "type":"template",
+                   "payload":{
+                       "template_type":"button",
+                       "text": title,
+                       "buttons":[
+                           {
+                               "type":"postback",
+                               "title":textButton,
+                               "payload":payloadButton
+                           }
+                       ]
+                   }
+               }
+           }
+       };
+
+       let optionsRes = {
+           method: 'POST',
+           uri: urlApiSendActionButtonToUser,
+           body: dataSend,
+           headers: {
+               "Content-type": "application/json; charset=UTF-8"
+           },
+           json: true
+       };
+
+       requestPromise(optionsRes).then(fbRes => {
+         resole(fbRes);
+       });
+    });
+}
+
 /* GET home page. */
 router.get('/', async function (req, res, next) {
     // Your verify token. Should be a random string.
@@ -191,18 +233,30 @@ router.post('/', async function (req, res, next) {
             webhook_event = entry.messaging[0];
         });
 
+        console.log(webhook_event);
+
         try {
-            if (webhook_event['message'] !== undefined && webhook_event['message']['is_echo'] !== true) {
+            if ((webhook_event['message'] !== undefined && webhook_event['message']['is_echo'] !== true) || (webhook_event['postback'] !== undefined)) {
 
                 let idSenderServerResponse = webhook_event.sender.id;
 
                 let responseMessageFromServer = "Đây là tin nhắn tự động từ autobot, from Nodejs Server! BOT đang trong quá trình hoàn thiện chưa triển khai. Dev: Lê Việt Thắng!";
 
                 // lấy nội dung tin nhắn của user
-                let messageOfUser = webhook_event['message']['text'];
+                let messageOfUser = null;
+
+                if (webhook_event['message'] !== undefined) {
+                    messageOfUser = webhook_event['message']['text'];
+                } else {
+                    messageOfUser = webhook_event['postback']['payload'];
+                }
 
                 // gửi ảnh hoặc file
-                let attachmentsData = webhook_event['message']['attachments'];
+                let attachmentsData = null;
+
+                if (webhook_event['message'] !== undefined && webhook_event['message'] !== null) {
+                   attachmentsData = webhook_event['message']['attachments']
+                }
 
                 // log ra thông tin user
                 console.log(webhook_event);
@@ -226,20 +280,26 @@ router.post('/', async function (req, res, next) {
                         if (messageOfUser.toUpperCase() === 'END') {
                             firebaseDatabase.ref('chatting').child(idSenderServerResponse).remove();
                             firebaseDatabase.ref('chatting').child(webhook_event.sender.id).remove();
-                            await responseMesseageToFacebook(webhook_event.sender.id, '<3 Bạn đã kết thúc trò chuyện, gõ "start" để bắt đầu <3');
-                            await responseMesseageToFacebook(idSenderServerResponse, '<3 Đối phương đã kết thúc trò chuyện, gõ "start" để bắt đầu <3');
+                            await responseActionButtonToFacebook(webhook_event.sender.id, '<3 Bạn đã kết thúc trò chuyện, gõ "start" để bắt đầu chat <3', 'Tìm người mới', 'START');
+                            // await responseMesseageToFacebook(webhook_event.sender.id, '<3 Bạn đã kết thúc trò chuyện, gõ "start" để bắt đầu <3');
+                            await responseActionButtonToFacebook(idSenderServerResponse, '<3 Đối phương đã kết thúc trò chuyện, gõ "start" để bắt đầu <3', 'Tìm người mới', 'START');
+                            // await responseMesseageToFacebook(idSenderServerResponse, '<3 Đối phương đã kết thúc trò chuyện, gõ "start" để bắt đầu <3');
                         } else if (messageOfUser.toUpperCase() === 'START'){
                           await responseMesseageToFacebook(webhook_event.sender.id, ':) Bạn đang trong cuộc trò chuyện, gõ "end" dể kết thúc :)');
                         } else {
                             await responseMesseageToFacebook(idSenderServerResponse, messageOfUser);
                         }
-                    } else if (attachmentsData !== undefined && attachmentsData !== null) {
+                    } else if (attachmentsData !== undefined && attachmentsData !== null && Array.isArray(attachmentsData)) {
                         console.log(attachmentsData);
                         let i = 0;
                         for ( i = 0; i < attachmentsData.length; i++) {
                             responseAttachmentsToFacebook(idSenderServerResponse, attachmentsData[i]['type'], attachmentsData[i]['payload']['url']);
                         }
                     }
+                }
+
+                if( messageOfUser!== undefined && messageOfUser !== null && messageOfUser.toUpperCase() === 'CHATBOT_HELPER_GUIDE'){
+                    await responseMesseageToFacebook(webhook_event.sender.id, ':) Gõ "start" để bắt đầu tìm kiếm và gõ "end" để kết thúc trò chuyện :)');
                 }
 
                 // if sender not in chatting
@@ -308,8 +368,8 @@ router.post('/', async function (req, res, next) {
                         responseMessageFromServer = '<3 Bạn đã thoát khỏi hàng chờ , gõ "start" để tìm kiếm đối phương <3';
                     }
                     await responseMesseageToFacebook(webhook_event.sender.id, responseMessageFromServer);
-                } else if( senderOnChatting === undefined || senderOnChatting === null){
-                    await responseMesseageToFacebook(idSenderServerResponse,  ':) Bạn phải gõ "start" để bắt đầu tìm kiếm :)');
+                } else  if(senderOnChatting === undefined || senderOnChatting === null) {
+                    await responseMesseageToFacebook(idSenderServerResponse, ':) Bạn phải gõ "start" để bắt đầu tìm kiếm :)');
                 }
 
 
